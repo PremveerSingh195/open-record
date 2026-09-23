@@ -195,10 +195,10 @@ export const RecordingControls: React.FC<RecordingControlsProps> = ({
         </div>
       )}
 
-      {/* Simple Camera Preview for Camera-Only Mode */}
+      {/* Widescreen Rectangle Camera Preview for Camera-Only Mode */}
       {mode === 'camera' && cameraStream && (
-        <div className="py-2 flex justify-center">
-          <div className="w-28 h-28 rounded-full overflow-hidden border-3 border-rose-500 shadow-lg bg-black">
+        <div className="w-full py-1">
+          <div className="relative w-full aspect-video rounded-2xl overflow-hidden border-2 border-slate-800 shadow-xl bg-black">
             <video
               ref={videoRef}
               muted
@@ -206,6 +206,11 @@ export const RecordingControls: React.FC<RecordingControlsProps> = ({
               autoPlay
               className="w-full h-full object-cover scale-x-[-1]"
             />
+            {/* Live Camera Indicator Badge */}
+            <div className="absolute top-2.5 left-2.5 px-2 py-0.5 rounded-md bg-black/60 backdrop-blur-xs border border-white/10 flex items-center gap-1.5 text-[10px] text-white font-medium pointer-events-none">
+              <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
+              <span>LIVE CAM</span>
+            </div>
           </div>
         </div>
       )}
