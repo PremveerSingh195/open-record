@@ -22,6 +22,7 @@ export function App() {
     error,
     recordingResult,
     systemAudioNotice,
+    activeCameraStream,
     startRecording,
     stopRecording,
     resetRecording,
@@ -65,6 +66,7 @@ export function App() {
               recordingTime={recordingTime}
               error={error}
               systemNotice={systemAudioNotice}
+              activeCameraStream={activeCameraStream}
               onStartRecording={handleStart}
               onStopRecording={stopRecording}
             />

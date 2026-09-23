@@ -3,6 +3,8 @@ import { CameraOverlayConfig } from '../types/recording';
 export interface CanvasCompositor {
   stream: MediaStream;
   stop: () => void;
+  setOverlayConfig: (config: Partial<CameraOverlayConfig>) => void;
+  getOverlayConfig: () => CameraOverlayConfig;
 }
 
 export const DEFAULT_OVERLAY_CONFIG: CameraOverlayConfig = {
@@ -65,6 +67,16 @@ export async function createCompositorStream(
 
   let animationFrameId: number | null = null;
   let isActive = true;
+  let currentOverlayConfig: CameraOverlayConfig = { ...overlayConfig };
+
+  const setOverlayConfig = (newConfig: Partial<CameraOverlayConfig>) => {
+    currentOverlayConfig = {
+      ...currentOverlayConfig,
+      ...newConfig,
+    };
+  };
+
+  const getOverlayConfig = (): CameraOverlayConfig => ({ ...currentOverlayConfig });
 
   const renderFrame = () => {
     if (!isActive) return;
@@ -75,14 +87,14 @@ export async function createCompositorStream(
     }
 
     // 2. Calculate camera overlay geometry
-    if (cameraVideo.readyState >= 2) {
-      const overlayWidth = Math.round(width * overlayConfig.sizeRatio);
+    if (cameraVideo.readyState >= 2 && currentOverlayConfig.enabled !== false) {
+      const overlayWidth = Math.round(width * currentOverlayConfig.sizeRatio);
       const camAspect = (cameraVideo.videoWidth && cameraVideo.videoHeight)
         ? (cameraVideo.videoWidth / cameraVideo.videoHeight)
         : 16 / 9;
 
       let overlayHeight = Math.round(overlayWidth / camAspect);
-      if (overlayConfig.shape === 'circle') {
+      if (currentOverlayConfig.shape === 'circle') {
         overlayHeight = overlayWidth; // 1:1 circle
       }
 
@@ -91,20 +103,20 @@ export async function createCompositorStream(
       let x = width - overlayWidth - margin;
       let y = height - overlayHeight - margin;
 
-      if (overlayConfig.position === 'bottom-left') {
+      if (currentOverlayConfig.position === 'bottom-left') {
         x = margin;
         y = height - overlayHeight - margin;
-      } else if (overlayConfig.position === 'top-right') {
+      } else if (currentOverlayConfig.position === 'top-right') {
         x = width - overlayWidth - margin;
         y = margin;
-      } else if (overlayConfig.position === 'top-left') {
+      } else if (currentOverlayConfig.position === 'top-left') {
         x = margin;
         y = margin;
       }
 
       ctx.save();
 
-      if (overlayConfig.shape === 'circle') {
+      if (currentOverlayConfig.shape === 'circle') {
         const radius = overlayWidth / 2;
         const centerX = x + radius;
         const centerY = y + radius;
@@ -187,5 +199,7 @@ export async function createCompositorStream(
   return {
     stream: canvasStream,
     stop,
+    setOverlayConfig,
+    getOverlayConfig,
   };
 }

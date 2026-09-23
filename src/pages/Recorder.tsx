@@ -14,6 +14,7 @@ interface RecorderPageProps {
   recordingTime: number;
   error: RecorderError | null;
   systemNotice: string | null;
+  activeCameraStream?: MediaStream | null;
   onStartRecording: (mode: RecordingMode, audio: AudioMode) => void;
   onStopRecording: () => void;
 }
@@ -23,6 +24,7 @@ export const RecorderPage: React.FC<RecorderPageProps> = ({
   recordingTime,
   error,
   systemNotice,
+  activeCameraStream,
   onStartRecording,
   onStopRecording,
 }) => {
@@ -118,6 +120,7 @@ export const RecorderPage: React.FC<RecorderPageProps> = ({
         durationSeconds={recordingTime}
         mode={recordingMode}
         audioMode={audioMode}
+        cameraStream={activeCameraStream}
         onStop={onStopRecording}
         systemNotice={systemNotice}
       />

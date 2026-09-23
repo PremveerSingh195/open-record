@@ -34,6 +34,7 @@ export interface CameraOverlayConfig {
   position: 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left';
   sizeRatio: number; // e.g. 0.22 = 22% of screen width
   shape: 'circle' | 'rounded-rect';
+  enabled?: boolean;
 }
 
 export interface RecorderError {

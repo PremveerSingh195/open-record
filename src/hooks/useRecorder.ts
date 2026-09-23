@@ -14,7 +14,6 @@ import {
   parseMediaError,
 } from '../services/media';
 import { setupAudioTracks, AudioMixResult } from '../services/audio';
-import { createCompositorStream, CanvasCompositor } from '../services/compositor';
 import { createRecorderService, RecorderService } from '../services/recorder';
 import { getStoredPreferences } from '../services/storage';
 
@@ -24,13 +23,13 @@ export function useRecorder() {
   const [error, setError] = useState<RecorderError | null>(null);
   const [recordingResult, setRecordingResult] = useState<RecordingResult | null>(null);
   const [systemAudioNotice, setSystemAudioNotice] = useState<string | null>(null);
+  const [activeCameraStream, setActiveCameraStream] = useState<MediaStream | null>(null);
 
   // References to active resources for reliable cleanup
   const recorderRef = useRef<RecorderService | null>(null);
   const screenStreamRef = useRef<MediaStream | null>(null);
   const cameraStreamRef = useRef<MediaStream | null>(null);
   const compositeStreamRef = useRef<MediaStream | null>(null);
-  const compositorRef = useRef<CanvasCompositor | null>(null);
   const audioResultRef = useRef<AudioMixResult | null>(null);
   const timerIntervalRef = useRef<number | null>(null);
   const isStoppingRef = useRef(false);
@@ -56,11 +55,6 @@ export function useRecorder() {
   const cleanupAllStreams = useCallback(() => {
     stopTimer();
 
-    if (compositorRef.current) {
-      compositorRef.current.stop();
-      compositorRef.current = null;
-    }
-
     if (audioResultRef.current) {
       audioResultRef.current.cleanup();
       audioResultRef.current = null;
@@ -75,6 +69,7 @@ export function useRecorder() {
       stopMediaStream(cameraStreamRef.current);
       cameraStreamRef.current = null;
     }
+    setActiveCameraStream(null);
 
     if (compositeStreamRef.current) {
       stopMediaStream(compositeStreamRef.current);
@@ -152,6 +147,7 @@ export function useRecorder() {
           // Capture camera
           const cameraStream = await getCameraMediaStream();
           cameraStreamRef.current = cameraStream;
+          setActiveCameraStream(cameraStream);
 
           // Handle native stop sharing
           const screenVideoTrack = screenStream.getVideoTracks()[0];
@@ -172,18 +168,17 @@ export function useRecorder() {
             );
           }
 
-          // Create canvas composition
-          const compositor = await createCompositorStream(screenStream, cameraStream);
-          compositorRef.current = compositor;
-          videoTrack = compositor.stream.getVideoTracks()[0] || null;
+          // Directly record screenStream (which naturally captures the floating camera bubble anywhere on screen!)
+          videoTrack = screenStream.getVideoTracks()[0] || null;
 
           if (!videoTrack) {
-            throw new Error('Failed to create composite video track.');
+            throw new Error('Failed to create screen video track.');
           }
         } else if (mode === 'camera') {
           // Camera only
           const cameraStream = await getCameraMediaStream();
           cameraStreamRef.current = cameraStream;
+          setActiveCameraStream(cameraStream);
 
           videoTrack = cameraStream.getVideoTracks()[0] || null;
           if (!videoTrack) {
@@ -273,6 +268,7 @@ export function useRecorder() {
     error,
     recordingResult,
     systemAudioNotice,
+    activeCameraStream,
     startRecording,
     stopRecording,
     resetRecording,
