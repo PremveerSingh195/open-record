@@ -4,7 +4,8 @@
   "version": "1.0.0",
   "description": "Production-ready, simple, and private screen and camera recorder for Chrome.",
   "permissions": [
-    "storage"
+    "storage",
+    "downloads"
   ],
   "action": {
     "default_title": "Screen & Camera Recorder",

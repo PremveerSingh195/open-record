@@ -2,7 +2,7 @@ import { RecordingResult } from '../types/recording';
 import { getSupportedMimeType } from '../utils/mimeType';
 
 export interface RecorderService {
-  start: (stream: MediaStream) => void;
+  start: (stream: MediaStream, preferredFormat?: 'mp4' | 'webm') => void;
   stop: () => Promise<RecordingResult>;
   getMimeType: () => string;
   isRecording: () => boolean;
@@ -23,10 +23,10 @@ export function createRecorderService(): RecorderService {
 
   const getMimeType = (): string => activeMimeType;
 
-  const start = (stream: MediaStream): void => {
+  const start = (stream: MediaStream, preferredFormat: 'mp4' | 'webm' = 'mp4'): void => {
     recordedChunks = [];
     startTime = Date.now();
-    activeMimeType = getSupportedMimeType();
+    activeMimeType = getSupportedMimeType(preferredFormat);
 
     try {
       mediaRecorder = new MediaRecorder(stream, {

@@ -5,6 +5,9 @@ const STORAGE_KEY = 'screen_recorder_preferences';
 const DEFAULT_PREFERENCES: RecordingPreferences = {
   recordingMode: 'screen',
   audioMode: 'microphone',
+  preferredFormat: 'mp4',
+  defaultFolder: '',
+  alwaysPromptFolder: true,
 };
 
 /**

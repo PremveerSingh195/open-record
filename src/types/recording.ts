@@ -4,9 +4,22 @@ export type AudioMode = 'none' | 'microphone' | 'system-microphone' | 'system';
 
 export type RecordingStatus = 'idle' | 'preparing' | 'recording' | 'stopped' | 'error';
 
+export type ExportFormat = 'mp4' | 'webm' | 'mkv' | 'mov' | 'avi';
+
+export interface SaveOptions {
+  filename: string;
+  format: ExportFormat;
+  folder: string;
+  promptFolder: boolean;
+  directoryHandle?: FileSystemDirectoryHandle | null;
+}
+
 export interface RecordingPreferences {
   recordingMode: RecordingMode;
   audioMode: AudioMode;
+  preferredFormat?: ExportFormat;
+  defaultFolder?: string;
+  alwaysPromptFolder?: boolean;
 }
 
 export interface RecordingResult {

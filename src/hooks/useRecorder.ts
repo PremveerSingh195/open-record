@@ -16,6 +16,7 @@ import {
 import { setupAudioTracks, AudioMixResult } from '../services/audio';
 import { createCompositorStream, CanvasCompositor } from '../services/compositor';
 import { createRecorderService, RecorderService } from '../services/recorder';
+import { getStoredPreferences } from '../services/storage';
 
 export function useRecorder() {
   const [status, setStatus] = useState<RecordingStatus>('idle');
@@ -216,10 +217,12 @@ export function useRecorder() {
         const recordStream = new MediaStream(tracksToRecord);
         compositeStreamRef.current = recordStream;
 
-        // Initialize and start MediaRecorder
+        // Initialize and start MediaRecorder with preferred format
         const recorder = createRecorderService();
         recorderRef.current = recorder;
-        recorder.start(recordStream);
+        const prefs = await getStoredPreferences();
+        const preferredFmt = prefs.preferredFormat === 'webm' ? 'webm' : 'mp4';
+        recorder.start(recordStream, preferredFmt);
 
         startTimer();
         setStatus('recording');

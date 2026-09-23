@@ -1,8 +1,11 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { Download, RotateCcw, CheckCircle2 } from 'lucide-react';
-import { RecordingResult, RecordingMode } from '../types/recording';
-import { generateRecordingFilename } from '../utils/filename';
+import { RecordingResult, RecordingMode, RecordingPreferences } from '../types/recording';
+import { generateBaseRecordingFilename } from '../utils/filename';
 import { formatDuration } from '../utils/formatTime';
+import { SaveOptionsModal } from './SaveOptionsModal';
+import { saveRecordingFile, SaveFileOptions } from '../services/download';
+import { getStoredPreferences, saveStoredPreferences } from '../services/storage';
 
 interface VideoPreviewProps {
   result: RecordingResult;
@@ -15,8 +18,14 @@ export const VideoPreview: React.FC<VideoPreviewProps> = ({
   mode,
   onNewRecording,
 }) => {
-  const [downloaded, setDownloaded] = React.useState(false);
+  const [downloaded, setDownloaded] = useState(false);
+  const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
+  const [preferences, setPreferences] = useState<RecordingPreferences | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+
+  useEffect(() => {
+    getStoredPreferences().then(setPreferences);
+  }, []);
 
   const formatFileSize = (bytes: number): string => {
     if (bytes < 1024 * 1024) {
@@ -25,15 +34,24 @@ export const VideoPreview: React.FC<VideoPreviewProps> = ({
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
-  const handleDownload = () => {
-    const filename = generateRecordingFilename(mode, result.mimeType, result.timestamp);
-    const link = document.createElement('a');
-    link.href = result.url;
-    link.download = filename;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    setDownloaded(true);
+  const defaultBaseFilename = generateBaseRecordingFilename(mode, result.timestamp);
+
+  const handleOpenSaveModal = () => {
+    setIsSaveModalOpen(true);
+  };
+
+  const handleSave = async (options: SaveFileOptions): Promise<boolean> => {
+    const success = await saveRecordingFile(options);
+    if (success) {
+      setDownloaded(true);
+      // Persist chosen format and folder preferences for next time
+      saveStoredPreferences({
+        preferredFormat: options.format,
+        defaultFolder: options.folder,
+        alwaysPromptFolder: options.promptFolder,
+      });
+    }
+    return success;
   };
 
   return (
@@ -63,7 +81,7 @@ export const VideoPreview: React.FC<VideoPreviewProps> = ({
       <div className="grid grid-cols-2 gap-2.5 pt-1">
         <button
           type="button"
-          onClick={handleDownload}
+          onClick={handleOpenSaveModal}
           className={`flex items-center justify-center gap-2 py-3 px-3 rounded-xl font-medium text-xs transition-all shadow-sm active:scale-[0.98] ${
             downloaded
               ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/20'
@@ -73,7 +91,7 @@ export const VideoPreview: React.FC<VideoPreviewProps> = ({
           {downloaded ? (
             <>
               <CheckCircle2 className="w-4 h-4" />
-              <span>Saved!</span>
+              <span>Saved (Save Again)</span>
             </>
           ) : (
             <>
@@ -92,6 +110,19 @@ export const VideoPreview: React.FC<VideoPreviewProps> = ({
           <span>New Recording</span>
         </button>
       </div>
+
+      {/* Save Options Modal (Format & Folder Selector) */}
+      <SaveOptionsModal
+        isOpen={isSaveModalOpen}
+        onClose={() => setIsSaveModalOpen(false)}
+        onSave={handleSave}
+        defaultFilename={defaultBaseFilename}
+        blob={result.blob}
+        durationSeconds={result.durationSeconds}
+        initialFormat={preferences?.preferredFormat || 'mp4'}
+        initialFolder={preferences?.defaultFolder || ''}
+        initialPromptFolder={preferences?.alwaysPromptFolder ?? true}
+      />
     </div>
   );
 };
