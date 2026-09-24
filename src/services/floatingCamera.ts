@@ -5,6 +5,36 @@ export interface FloatingCameraHandle {
 
 let activePipWindow: Window | null = null;
 let activePipVideo: HTMLVideoElement | null = null;
+let currentCloseCallback: (() => void) | null = null;
+
+export function setFloatingCameraCloseCallback(cb: (() => void) | null): void {
+  currentCloseCallback = cb;
+}
+
+/**
+ * Updates the stream of an already active floating camera window without closing it.
+ */
+export function updateFloatingCameraStream(stream: MediaStream): void {
+  stream.getVideoTracks().forEach((track) => {
+    track.enabled = true;
+  });
+
+  if (activePipWindow && !activePipWindow.closed) {
+    const video = activePipWindow.document.querySelector('video');
+    if (video) {
+      if (video.srcObject !== stream) {
+        video.srcObject = stream;
+      }
+      video.play().catch(() => {});
+    }
+  }
+  if (activePipVideo) {
+    if (activePipVideo.srcObject !== stream) {
+      activePipVideo.srcObject = stream;
+    }
+    activePipVideo.play().catch(() => {});
+  }
+}
 
 /**
  * Opens an Always-On-Top floating camera bubble on the user's screen
@@ -16,6 +46,10 @@ export async function openFloatingCamera(
 ): Promise<FloatingCameraHandle> {
   // If already open, close previous instance
   closeFloatingCamera();
+
+  if (onClose) {
+    currentCloseCallback = onClose;
+  }
 
   // Approach 1: Chrome 116+ Document Picture-in-Picture (Custom Always-On-Top Floating HTML Window)
   if (typeof window !== 'undefined' && 'documentPictureInPicture' in window) {
@@ -114,7 +148,6 @@ export async function openFloatingCamera(
       frame.className = 'bubble-frame';
 
       const video = pipWindow.document.createElement('video');
-      video.srcObject = stream;
       video.autoplay = true;
       video.muted = true;
       video.playsInline = true;
@@ -132,14 +165,29 @@ export async function openFloatingCamera(
       wrapper.appendChild(frame);
       pipWindow.document.body.appendChild(wrapper);
 
+      // Ensure video tracks are enabled and attached after DOM insertion
+      stream.getVideoTracks().forEach((track) => {
+        track.enabled = true;
+      });
+
+      video.srcObject = stream;
+      video.onloadedmetadata = () => {
+        video.play().catch((err) => {
+          console.warn('PiP video play on metadata error:', err);
+        });
+      };
+      video.play().catch((err) => {
+        console.warn('PiP video autoplay interrupted:', err);
+      });
+
       pipWindow.addEventListener('pagehide', () => {
         activePipWindow = null;
-        onClose?.();
+        currentCloseCallback?.();
       });
 
       return {
         close: () => closeFloatingCamera(),
-        isOpen: () => activePipWindow !== null,
+        isOpen: () => activePipWindow !== null && !activePipWindow.closed,
       };
     } catch (err) {
       console.warn('Document Picture-in-Picture request failed, falling back to standard video PiP:', err);
@@ -169,7 +217,7 @@ export async function openFloatingCamera(
         video.parentNode.removeChild(video);
       }
       activePipVideo = null;
-      onClose?.();
+      currentCloseCallback?.();
     };
 
     video.addEventListener('leavepictureinpicture', cleanup);
@@ -208,5 +256,9 @@ export function closeFloatingCamera(): void {
 }
 
 export function isFloatingCameraActive(): boolean {
-  return activePipWindow !== null || (typeof document !== 'undefined' && document.pictureInPictureElement !== null);
+  return (
+    (activePipWindow !== null && !activePipWindow.closed) ||
+    (typeof document !== 'undefined' && document.pictureInPictureElement !== null)
+  );
 }
+

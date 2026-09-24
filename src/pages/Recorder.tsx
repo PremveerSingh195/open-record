@@ -7,6 +7,7 @@ import { StartRecordingButton } from '../components/StartRecordingButton';
 import { RecordingControls } from '../components/RecordingControls';
 import { CameraPreview } from '../components/CameraPreview';
 import { useCamera } from '../hooks/useCamera';
+import { openFloatingCamera, isFloatingCameraActive } from '../services/floatingCamera';
 import { AlertTriangle, AlertCircle } from 'lucide-react';
 
 interface RecorderPageProps {
@@ -15,7 +16,7 @@ interface RecorderPageProps {
   error: RecorderError | null;
   systemNotice: string | null;
   activeCameraStream?: MediaStream | null;
-  onStartRecording: (mode: RecordingMode, audio: AudioMode) => void;
+  onStartRecording: (mode: RecordingMode, audio: AudioMode, cameraStream?: MediaStream | null) => void;
   onStopRecording: () => void;
 }
 
@@ -61,8 +62,10 @@ export const RecorderPage: React.FC<RecorderPageProps> = ({
     if (isInitializing) return;
 
     if (status === 'recording') {
-      // During active recording, stop standalone camera preview stream to free hardware
-      stopCamera();
+      // During active recording, only stop camera if recording in screen-only mode
+      if (recordingMode === 'screen') {
+        stopCamera();
+      }
       return;
     }
 
@@ -89,7 +92,7 @@ export const RecorderPage: React.FC<RecorderPageProps> = ({
     saveStoredPreferences({ audioMode: audio });
   }, []);
 
-  const handleStart = () => {
+  const handleStart = async () => {
     // If running in a transient popup bubble, open persistent window so Chrome doesn't close on screen share
     try {
       if (typeof chrome !== 'undefined' && chrome.extension?.getViews) {
@@ -110,9 +113,32 @@ export const RecorderPage: React.FC<RecorderPageProps> = ({
       console.warn('Popup check error:', err);
     }
 
-    // Stop local preview camera stream so the recorder can claim exclusive access cleanly
-    stopCamera();
-    onStartRecording(recordingMode, audioMode);
+    let streamToPass = cameraStream;
+
+    // In Screen + Camera mode, automatically pop out the floating camera bubble by default!
+    // Since handleStart is triggered directly by user click, user gesture is active and Chrome allows opening PiP!
+    if (recordingMode === 'screen-camera') {
+      if (
+        !streamToPass ||
+        !streamToPass.active ||
+        !streamToPass.getVideoTracks().some((t) => t.readyState === 'live')
+      ) {
+        streamToPass = await startCamera();
+      }
+
+      if (streamToPass && !isFloatingCameraActive()) {
+        try {
+          await openFloatingCamera(streamToPass);
+        } catch (err) {
+          console.warn('Could not auto-open floating camera bubble:', err);
+        }
+      }
+    } else if (recordingMode === 'screen') {
+      // In screen-only mode without camera, stop camera preview
+      stopCamera();
+    }
+
+    onStartRecording(recordingMode, audioMode, streamToPass);
   };
 
   // Dedicated Recording view when recording is active

@@ -11,6 +11,8 @@ import {
   openFloatingCamera,
   closeFloatingCamera,
   isFloatingCameraActive,
+  updateFloatingCameraStream,
+  setFloatingCameraCloseCallback,
 } from '../services/floatingCamera';
 
 interface RecordingControlsProps {
@@ -31,7 +33,7 @@ export const RecordingControls: React.FC<RecordingControlsProps> = ({
   systemNotice,
 }) => {
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  const [isPipActive, setIsPipActive] = useState(false);
+  const [isPipActive, setIsPipActive] = useState(() => isFloatingCameraActive());
 
   const setVideoRef = React.useCallback(
     (video: HTMLVideoElement | null) => {
@@ -61,6 +63,23 @@ export const RecordingControls: React.FC<RecordingControlsProps> = ({
     }
   }, [cameraStream]);
 
+  // Keep floating camera close callback wired to update button state
+  useEffect(() => {
+    setFloatingCameraCloseCallback(() => {
+      setIsPipActive(false);
+    });
+    return () => {
+      setFloatingCameraCloseCallback(null);
+    };
+  }, []);
+
+  // Update floating camera stream if it changes
+  useEffect(() => {
+    if (cameraStream && isFloatingCameraActive()) {
+      updateFloatingCameraStream(cameraStream);
+    }
+  }, [cameraStream]);
+
   // Clean up floating window when recording stops or component unmounts
   useEffect(() => {
     return () => {
@@ -68,8 +87,13 @@ export const RecordingControls: React.FC<RecordingControlsProps> = ({
     };
   }, []);
 
-  // Automatically attempt to pop out the floating camera bubble when recording starts
+  // Ensure isPipActive is in sync, and attempt auto-open if not already opened
   useEffect(() => {
+    if (isFloatingCameraActive()) {
+      setIsPipActive(true);
+      return;
+    }
+
     if (mode === 'screen-camera' && cameraStream && !isFloatingCameraActive()) {
       openFloatingCamera(cameraStream, () => {
         setIsPipActive(false);

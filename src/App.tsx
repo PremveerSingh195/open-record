@@ -29,9 +29,9 @@ export function App() {
   } = useRecorder();
 
   const handleStart = useCallback(
-    (mode: RecordingMode, audio: AudioMode) => {
+    (mode: RecordingMode, audio: AudioMode, initialCameraStream?: MediaStream | null) => {
       setActiveMode(mode);
-      startRecording(mode, audio);
+      startRecording(mode, audio, initialCameraStream);
     },
     [startRecording]
   );

@@ -16,6 +16,7 @@ import {
 import { setupAudioTracks, AudioMixResult } from '../services/audio';
 import { createRecorderService, RecorderService } from '../services/recorder';
 import { getStoredPreferences } from '../services/storage';
+import { closeFloatingCamera } from '../services/floatingCamera';
 
 export function useRecorder() {
   const [status, setStatus] = useState<RecordingStatus>('idle');
@@ -103,7 +104,11 @@ export function useRecorder() {
 
   // Start recording function
   const startRecording = useCallback(
-    async (mode: RecordingMode, audioMode: AudioMode) => {
+    async (
+      mode: RecordingMode,
+      audioMode: AudioMode,
+      initialCameraStream?: MediaStream | null
+    ) => {
       setError(null);
       setSystemAudioNotice(null);
       setStatus('preparing');
@@ -144,8 +149,15 @@ export function useRecorder() {
           const screenStream = await getScreenMediaStream(needSystemAudio);
           screenStreamRef.current = screenStream;
 
-          // Capture camera
-          const cameraStream = await getCameraMediaStream();
+          // Capture or reuse camera
+          let cameraStream = initialCameraStream;
+          if (
+            !cameraStream ||
+            !cameraStream.active ||
+            !cameraStream.getVideoTracks().some((t) => t.readyState === 'live')
+          ) {
+            cameraStream = await getCameraMediaStream();
+          }
           cameraStreamRef.current = cameraStream;
           setActiveCameraStream(cameraStream);
 
@@ -176,7 +188,14 @@ export function useRecorder() {
           }
         } else if (mode === 'camera') {
           // Camera only
-          const cameraStream = await getCameraMediaStream();
+          let cameraStream = initialCameraStream;
+          if (
+            !cameraStream ||
+            !cameraStream.active ||
+            !cameraStream.getVideoTracks().some((t) => t.readyState === 'live')
+          ) {
+            cameraStream = await getCameraMediaStream();
+          }
           cameraStreamRef.current = cameraStream;
           setActiveCameraStream(cameraStream);
 
@@ -223,6 +242,7 @@ export function useRecorder() {
         setStatus('recording');
       } catch (err) {
         cleanupAllStreams();
+        closeFloatingCamera();
         const parsed = parseMediaError(
           err,
           mode === 'camera' ? 'camera' : 'screen'
