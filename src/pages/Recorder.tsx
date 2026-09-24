@@ -58,6 +58,8 @@ export const RecorderPage: React.FC<RecorderPageProps> = ({
 
   // Sync camera stream for preview if mode requires camera
   useEffect(() => {
+    if (isInitializing) return;
+
     if (status === 'recording') {
       // During active recording, stop standalone camera preview stream to free hardware
       stopCamera();
@@ -69,7 +71,7 @@ export const RecorderPage: React.FC<RecorderPageProps> = ({
     } else {
       stopCamera();
     }
-  }, [recordingMode, status, startCamera, stopCamera]);
+  }, [recordingMode, status, isInitializing, startCamera, stopCamera]);
 
   const handleModeChange = useCallback((mode: RecordingMode) => {
     setRecordingMode(mode);

@@ -30,14 +30,31 @@ export const RecordingControls: React.FC<RecordingControlsProps> = ({
   onStop,
   systemNotice,
 }) => {
-  const videoRef = useRef<HTMLVideoElement>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
   const [isPipActive, setIsPipActive] = useState(false);
+
+  const setVideoRef = React.useCallback(
+    (video: HTMLVideoElement | null) => {
+      videoRef.current = video;
+      if (video && cameraStream) {
+        if (video.srcObject !== cameraStream) {
+          video.srcObject = cameraStream;
+        }
+        video.play().catch((err) => {
+          console.warn('Camera preview error:', err);
+        });
+      }
+    },
+    [cameraStream]
+  );
 
   // Sync internal video stream for camera-only mode
   useEffect(() => {
     const video = videoRef.current;
     if (video && cameraStream) {
-      video.srcObject = cameraStream;
+      if (video.srcObject !== cameraStream) {
+        video.srcObject = cameraStream;
+      }
       video.play().catch((err) => {
         console.warn('Camera preview error:', err);
       });
@@ -200,10 +217,13 @@ export const RecordingControls: React.FC<RecordingControlsProps> = ({
         <div className="w-full py-1">
           <div className="relative w-full aspect-video rounded-2xl overflow-hidden border-2 border-slate-800 shadow-xl bg-black">
             <video
-              ref={videoRef}
+              ref={setVideoRef}
               muted
               playsInline
               autoPlay
+              onLoadedMetadata={(e) => {
+                e.currentTarget.play().catch(() => {});
+              }}
               className="w-full h-full object-cover scale-x-[-1]"
             />
             {/* Live Camera Indicator Badge */}

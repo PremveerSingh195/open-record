@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { Camera, AlertCircle, RefreshCw, ExternalLink, HelpCircle, ShieldAlert } from 'lucide-react';
 import { RecordingMode, RecorderError } from '../types/recording';
 
@@ -17,21 +17,57 @@ export const CameraPreview: React.FC<CameraPreviewProps> = ({
   error,
   onRetry,
 }) => {
-  const videoRef = useRef<HTMLVideoElement>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
   const [showMacHelp, setShowMacHelp] = useState(false);
 
-  useEffect(() => {
-    const video = videoRef.current;
-    if (video) {
-      if (stream) {
-        video.srcObject = stream;
+  const attachStreamToVideo = useCallback(
+    (video: HTMLVideoElement | null, mediaStream: MediaStream | null) => {
+      if (!video) return;
+      if (mediaStream) {
+        if (video.srcObject !== mediaStream) {
+          video.srcObject = mediaStream;
+        }
         video.play().catch((err) => {
           console.warn('Camera preview autoplay interrupted:', err);
         });
       } else {
         video.srcObject = null;
       }
-    }
+    },
+    []
+  );
+
+  // Callback ref so whenever the video element mounts or remounts, srcObject is attached immediately
+  const setVideoRef = useCallback(
+    (node: HTMLVideoElement | null) => {
+      videoRef.current = node;
+      attachStreamToVideo(node, stream);
+    },
+    [stream, attachStreamToVideo]
+  );
+
+  // Re-verify stream attachment whenever stream or mode changes
+  useEffect(() => {
+    attachStreamToVideo(videoRef.current, stream);
+  }, [stream, mode, attachStreamToVideo]);
+
+  // Resume playback on visibility / focus changes if paused by browser
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && videoRef.current && stream) {
+        if (videoRef.current.srcObject !== stream) {
+          videoRef.current.srcObject = stream;
+        }
+        videoRef.current.play().catch(() => {});
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleVisibilityChange);
+    };
   }, [stream]);
 
   if (mode === 'screen') {
@@ -61,7 +97,7 @@ export const CameraPreview: React.FC<CameraPreviewProps> = ({
         <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500">
           Camera Preview
         </label>
-        {stream && (
+        {stream && !isLoading && !error && (
           <span className="flex items-center gap-1.5 text-[11px] text-emerald-600 font-medium">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
             Camera Active
@@ -71,14 +107,14 @@ export const CameraPreview: React.FC<CameraPreviewProps> = ({
 
       <div className="relative overflow-hidden rounded-xl border border-slate-200/90 bg-slate-950 aspect-video flex items-center justify-center shadow-inner">
         {isLoading && (
-          <div className="flex flex-col items-center space-y-2 text-slate-400">
+          <div className="flex flex-col items-center space-y-2 text-slate-400 z-20">
             <RefreshCw className="w-5 h-5 animate-spin text-rose-500" />
             <span className="text-xs">Connecting camera...</span>
           </div>
         )}
 
         {error && (
-          <div className="p-3.5 text-center space-y-2 max-w-xs z-10">
+          <div className="p-3.5 text-center space-y-2 max-w-xs z-30">
             <AlertCircle className="w-5 h-5 text-rose-400 mx-auto" />
             <p className="text-xs font-semibold text-white">{error.title}</p>
             <p className="text-[11px] text-slate-300 leading-tight">
@@ -139,42 +175,42 @@ export const CameraPreview: React.FC<CameraPreviewProps> = ({
         )}
 
         {!isLoading && !error && !stream && (
-          <div className="flex flex-col items-center space-y-1.5 text-slate-400">
+          <div className="flex flex-col items-center space-y-1.5 text-slate-400 z-20">
             <Camera className="w-6 h-6 text-slate-500" />
             <span className="text-xs">Camera preview unavailable</span>
           </div>
         )}
 
-        {/* Video feed */}
-        {mode === 'camera' ? (
-          <video
-            ref={videoRef}
-            muted
-            playsInline
-            autoPlay
-            className={`w-full h-full object-cover scale-x-[-1] ${
-              stream ? 'block' : 'hidden'
-            }`}
-          />
-        ) : (
-          /* Screen + Camera layout simulation */
-          <div className={`relative w-full h-full bg-slate-900 ${stream ? 'block' : 'hidden'}`}>
-            <div className="absolute inset-0 flex items-center justify-center text-slate-500 text-xs font-medium border border-dashed border-slate-800 m-2 rounded-lg">
+        {/* Screen Area simulation (only visible in screen-camera mode) */}
+        {mode === 'screen-camera' && !error && !isLoading && (
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0">
+            <div className="w-[calc(100%-16px)] h-[calc(100%-16px)] flex items-center justify-center text-slate-500 text-xs font-medium border border-dashed border-slate-800 rounded-lg">
               Screen Area
-            </div>
-            {/* Draggable/positioned camera avatar overlay preview */}
-            <div className="absolute bottom-3 right-3 w-16 h-16 rounded-full overflow-hidden border-2 border-white shadow-lg bg-slate-800">
-              <video
-                ref={videoRef}
-                muted
-                playsInline
-                autoPlay
-                className="w-full h-full object-cover scale-x-[-1]"
-              />
             </div>
           </div>
         )}
+
+        {/* Persistent camera video element - transitions smoothly between full preview and PIP circle without unmounting */}
+        <div
+          className={`transition-all duration-300 ease-in-out z-10 ${
+            mode === 'camera'
+              ? 'absolute inset-0 w-full h-full rounded-none overflow-hidden'
+              : 'absolute bottom-3 right-3 w-16 h-16 rounded-full overflow-hidden border-2 border-white shadow-lg bg-slate-800'
+          } ${stream && !error && !isLoading ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+        >
+          <video
+            ref={setVideoRef}
+            muted
+            playsInline
+            autoPlay
+            onLoadedMetadata={(e) => {
+              e.currentTarget.play().catch(() => {});
+            }}
+            className="w-full h-full object-cover scale-x-[-1]"
+          />
+        </div>
       </div>
     </div>
   );
 };
+
