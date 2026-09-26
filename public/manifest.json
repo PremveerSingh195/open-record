@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Screen & Camera Recorder",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Production-ready, simple, and private screen and camera recorder.",
   "permissions": [
     "storage",
