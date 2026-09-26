@@ -12,6 +12,15 @@
 
 let recorderWindowId: number | null = null;
 
+// Open onboarding guide when extension is installed (after user clicks "Add to Chrome" / "Add to Brave")
+chrome.runtime.onInstalled.addListener((details) => {
+  if (details.reason === 'install') {
+    chrome.tabs.create({
+      url: 'https://submitlaunch.com/Screen-recorder-Guide',
+    });
+  }
+});
+
 chrome.action.onClicked.addListener(async () => {
   // If the recorder window is already open, focus it
   if (recorderWindowId !== null) {
